@@ -1,0 +1,80 @@
+# Benchmarking addr and DeGAUSS
+
+`geocode_both.bat` runs DeGAUSS first and `addr` second within one IBM LSF job. Both methods receive the same input and core count, but their outputs and timing measurements are saved separately.
+
+## Setup
+
+Install addr package version using `./setup_r.sh`.
+
+Make logs dir:
+
+```bash
+mkdir -p logs
+chmod 700 . logs
+```
+
+Pull DeGAUSS container:
+
+```bash
+module load apptainer
+apptainer pull \
+  degauss-geocoder-3.4.1.sif \
+  docker://ghcr.io/degauss-org/geocoder:3.4.1
+```
+
+The project `.Rprofile` should add `.R-library` to `.libPaths()`, and `addr` should already be installed in that library with `./setup_r.sh`. 
+The job uses R to find the installed `addr-geocode` executable; it does not set `R_LIBS_USER` itself.
+
+`R_USER_DATA_DIR` defaults to `/scratch/$USER`.
+The job creates that directory if needed and uses it for the `addr` reference data. To use another location, export `R_USER_DATA_DIR` before submitting the job.
+For end-to-end warm timings, install the [Full TAF Bundle](https://github.com/geomarker-io/addr#full-taf-bundle).
+
+The project `.Rprofile` and `.R-library` apply only to the host-side `addr` run. 
+DeGAUSS runs with an isolated container home and environment, starts in `/work`, and receives only its private run directory as a bind mount. 
+Its R process is also told to ignore user startup files and user library variables so it cannot load packages from the host project library.
+
+## Submit
+
+Choose 1, 4, or 16 cores. Because LSF allocates resources before the batch script starts, `N_CORES` must be exported **and** supplied to `bsub -n`:
+
+```bash
+export N_CORES=4
+export INPUT_CSV=my_address_file.csv
+bsub -n "$N_CORES" -M 64000 \
+  -R "span[hosts=1] rusage[mem=$((64000 / N_CORES))]" \
+  < geocode_both.bat
+```
+
+
+The batch file checks that the requested LSF allocation equals `N_CORES` before either method starts.
+
+The input filename becomes part of the results path automatically. For example:
+
+```bash
+export INPUT_CSV="$PWD/regional_10k.csv"
+```
+
+stores its timing files below `results/regional_10k/`. Spaces, periods, and other punctuation in the filename stem are changed to underscores. The LSF job ID keeps repeated runs of the same input from overwriting one another.
+
+## Results
+
+One submission creates:
+
+```text
+results/INPUT-NAME/N-cores/JOB-ID/
+  degauss/
+    time.txt
+  addr/
+    time.txt
+```
+
+After each method finishes, the job deletes that method's copied input, geocoded output, and cache files. Cleanup happens after `/usr/bin/time` finishes, so it is not included in the reported timing. The shared `addr` reference data under `R_USER_DATA_DIR` are retained.
+
+If DeGAUSS fails, the job still attempts `addr`. The overall job exits unsuccessfully when either method fails or its output cleanup is incomplete.
+
+
+## Methods Note
+
+Geocoding runtime was evaluated on the Cincinnati Children’s Research HPC cluster using IBM LSF. Separate batch jobs were submitted for each input dataset and CPU allocation (1, 4, or 16 cores). Jobs were restricted to a single compute node and requested 64 GB of total memory. Within each job, the same CSV file—containing an `address` column—was processed sequentially by DeGAUSS geocoder v3.4.1 and `addr` v1.3.0. DeGAUSS was executed from a pinned Apptainer image, while `addr` was run using R 4.6.1 with 2025 TAF reference data and a worker count equal to the allocated number of cores. OpenMP and BLAS threading were limited to one thread to prevent additional implicit parallelism.
+
+Each method received a private copy of the input file in a fresh run directory. The DeGAUSS container was isolated from the host user environment and R library, with only its run directory mounted into the container. Both measurements included process startup, CSV reading, address processing and geocoding, output construction, and CSV writing. GNU `/usr/bin/time -v` recorded elapsed wall-clock time, user and system CPU time, CPU utilization, maximum resident memory, filesystem activity, and exit status. Cleanup was performed only after timing had ended. Copied inputs, geocoded outputs, and run-specific caches were then deleted to limit storage of address-level data; only the timing record was retained. Timing files were organized by input dataset, core count, geocoding method, and LSF job identifier, allowing repeated runs to be distinguished without retaining row-level results.
