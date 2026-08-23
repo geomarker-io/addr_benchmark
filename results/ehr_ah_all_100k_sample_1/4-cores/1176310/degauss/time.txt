@@ -1,0 +1,23 @@
+	Command being timed: "apptainer run --containall --pwd /work --bind /users/broeg1/addr_benchmark/results/ehr_ah_all_100k_sample_1/4-cores/1176310/degauss:/work /users/broeg1/addr_benchmark/degauss-geocoder-3.4.1.sif /work/input.csv"
+	User time (seconds): 20249.62
+	System time (seconds): 5454.85
+	Percent of CPU this job got: 373%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:54:35
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 634236
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2677
+	Minor (reclaiming a frame) page faults: 488445840
+	Voluntary context switches: 93947637
+	Involuntary context switches: 334946
+	Swaps: 0
+	File system inputs: 2055848
+	File system outputs: 1409064
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
