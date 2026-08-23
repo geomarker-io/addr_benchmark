@@ -1,10 +1,18 @@
 # Benchmarking addr and DeGAUSS
 
-`geocode_both.bat` runs DeGAUSS first and `addr` second within one IBM LSF job. Both methods receive the same input and core count, but their outputs and timing measurements are saved separately.
+`geocode_both.bat` runs DeGAUSS and `addr` in randomized order within one IBM
+LSF job. Both methods receive the same input and core count, but their outputs
+and timing measurements are saved separately.
 
 ## Setup
 
-Install addr package version using `./setup_r.sh`.
+Install the benchmark packages using `./setup_r.sh`.
+The script installs the latest `addr` release explicitly from the `geomarker`
+R-universe repository; it does not request a historical package
+version. After installation, it checks that the installed release is version
+1.3.0, as specified in the Methods Note, and fails if the versions do not
+match. When a new release is validated for the benchmark, update
+`EXPECTED_ADDR_VERSION` in `setup_r.sh` and the Methods Note together.
 
 Make logs dir:
 
@@ -62,19 +70,23 @@ One submission creates:
 
 ```text
 results/INPUT-NAME/N-cores/JOB-ID/
+  method_order.txt
   degauss/
     time.txt
   addr/
     time.txt
 ```
 
+Each job randomly chooses whether DeGAUSS or `addr` runs first and records the
+chosen sequence in `method_order.txt`.
+
 After each method finishes, the job deletes that method's copied input, geocoded output, and cache files. Cleanup happens after `/usr/bin/time` finishes, so it is not included in the reported timing. The shared `addr` reference data under `R_USER_DATA_DIR` are retained.
 
-If DeGAUSS fails, the job still attempts `addr`. The overall job exits unsuccessfully when either method fails or its output cleanup is incomplete.
+If either method fails, the job still attempts the other method. The overall job exits unsuccessfully when either method fails or its output cleanup is incomplete.
 
 
 ## Methods Note
 
-Geocoding runtime was evaluated on the Cincinnati Children’s Research HPC cluster using IBM LSF. Separate batch jobs were submitted for each input dataset and CPU allocation (1, 4, or 16 cores). Jobs were restricted to a single compute node and requested 64 GB of total memory. Within each job, the same CSV file—containing an `address` column—was processed sequentially by DeGAUSS geocoder v3.4.1 and `addr` v1.3.0. DeGAUSS was executed from a pinned Apptainer image, while `addr` was run using R 4.6.1 with 2025 TAF reference data and a worker count equal to the allocated number of cores. OpenMP and BLAS threading were limited to one thread to prevent additional implicit parallelism.
+Geocoding runtime was evaluated on the Cincinnati Children’s Research HPC cluster using IBM LSF. Separate batch jobs were submitted for each input dataset and CPU allocation (1, 4, or 16 cores). Jobs were restricted to a single compute node and requested 64 GB of total memory. Within each job, the same CSV file—containing an `address` column—was processed sequentially by DeGAUSS geocoder v3.4.1 and `addr` v1.3.0. DeGAUSS was executed from a pinned Apptainer image. The latest `addr` release was installed from the `geomarker` R-universe repository without requesting a package version, and setup verified that the installed release matched the specified version 1.3.0. `addr` was run using R 4.5.2 with 2025 TAF reference data and a worker count equal to the allocated number of cores. OpenMP and BLAS threading were limited to one thread to prevent additional implicit parallelism. The execution order of DeGAUSS and `addr` was randomized independently for each batch job and recorded with the timing results.
 
-Each method received a private copy of the input file in a fresh run directory. The DeGAUSS container was isolated from the host user environment and R library, with only its run directory mounted into the container. Both measurements included process startup, CSV reading, address processing and geocoding, output construction, and CSV writing. GNU `/usr/bin/time -v` recorded elapsed wall-clock time, user and system CPU time, CPU utilization, maximum resident memory, filesystem activity, and exit status. Cleanup was performed only after timing had ended. Copied inputs, geocoded outputs, and run-specific caches were then deleted to limit storage of address-level data; only the timing record was retained. Timing files were organized by input dataset, core count, geocoding method, and LSF job identifier, allowing repeated runs to be distinguished without retaining row-level results.
+Each method received a private copy of the input file in a fresh run directory. The DeGAUSS container was isolated from the host user environment and R library, with only its run directory mounted into the container. Both measurements included process startup, CSV reading, address processing and geocoding, output construction, and CSV writing. GNU `/usr/bin/time -v` recorded elapsed wall-clock time, user and system CPU time, CPU utilization, maximum resident memory, filesystem activity, and exit status. Cleanup was performed only after timing had ended. Copied inputs, geocoded outputs, and run-specific caches were then deleted to limit storage of address-level data; only the timing records and randomized execution-order metadata were retained. Timing files were organized by input dataset, core count, geocoding method, and LSF job identifier, allowing repeated runs to be distinguished without retaining row-level results.

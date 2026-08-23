@@ -7,6 +7,9 @@ chmod 700 . logs
 
 module load R/4.5.2
 
+EXPECTED_ADDR_VERSION=1.3.0
+export EXPECTED_ADDR_VERSION
+
 Rscript -e '
 if (!requireNamespace("pak", quietly = TRUE)) {
   install.packages(
@@ -27,11 +30,27 @@ pak::repo_add(
 pak::pkg_install(
   c(
     "needenv",
-    "addr",
+    "geomarker::addr",
     "mirai"
   ),
   upgrade = FALSE,
   ask = FALSE
 )
-'
 
+installed_addr_version <- as.character(utils::packageVersion("addr"))
+expected_addr_version <- Sys.getenv("EXPECTED_ADDR_VERSION")
+
+if (!identical(installed_addr_version, expected_addr_version)) {
+  stop(
+    "Installed addr ", installed_addr_version,
+    " from the geomarker R-universe, but this benchmark expects addr ",
+    expected_addr_version, ". Update EXPECTED_ADDR_VERSION and the Methods ",
+    "Note together after validating the new release."
+  )
+}
+
+message(
+  "Verified addr ", installed_addr_version,
+  " from the geomarker R-universe."
+)
+'

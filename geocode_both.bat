@@ -52,6 +52,44 @@ keep_time_file_only() {
     ! -path "$method_dir/time.txt" -delete
 }
 
+run_degauss() {
+  echo "Starting DeGAUSS with $N_CORES cores"
+  if /usr/bin/time -v -o "$DEGAUSS_DIR/time.txt" \
+    apptainer run --containall --pwd /work \
+    --bind "$DEGAUSS_DIR:/work" \
+    "$DEGAUSS_IMAGE" /work/input.csv; then
+    DEGAUSS_STATUS=0
+  else
+    DEGAUSS_STATUS=$?
+  fi
+
+  if ! keep_time_file_only "$DEGAUSS_DIR"; then
+    echo "Could not completely clean DeGAUSS outputs: $DEGAUSS_DIR" >&2
+    DEGAUSS_CLEANUP_STATUS=1
+  fi
+}
+
+run_addr() {
+  echo "Starting addr with $N_CORES workers"
+  if /usr/bin/time -v -o "$ADDR_DIR/time.txt" \
+    Rscript "$ADDR_CLI" \
+    --input "$ADDR_DIR/input.csv" \
+    --output-dir "$ADDR_DIR" \
+    --workers "$N_CORES" \
+    --taf-year 2025 \
+    --data-dir "$R_USER_DATA_DIR" \
+    --overwrite; then
+    ADDR_STATUS=0
+  else
+    ADDR_STATUS=$?
+  fi
+
+  if ! keep_time_file_only "$ADDR_DIR"; then
+    echo "Could not completely clean addr outputs: $ADDR_DIR" >&2
+    ADDR_CLEANUP_STATUS=1
+  fi
+}
+
 RUN_DIR=$PROJECT_DIR/results/$INPUT_NAME/${N_CORES}-cores/$LSB_JOBID
 DEGAUSS_DIR=$RUN_DIR/degauss
 ADDR_DIR=$RUN_DIR/addr
@@ -72,37 +110,27 @@ export APPTAINERENV_R_LIBS_USER=/dev/null
 echo "addr data directory: $R_USER_DATA_DIR"
 echo "Input CSV: $INPUT_CSV"
 echo "Input name: $INPUT_NAME"
-echo "Starting DeGAUSS with $N_CORES cores"
-set +e
-/usr/bin/time -v -o "$DEGAUSS_DIR/time.txt" \
-  apptainer run --containall --pwd /work \
-  --bind "$DEGAUSS_DIR:/work" \
-  "$DEGAUSS_IMAGE" /work/input.csv
-DEGAUSS_STATUS=$?
-set -e
+
+DEGAUSS_STATUS=0
+ADDR_STATUS=0
 DEGAUSS_CLEANUP_STATUS=0
-if ! keep_time_file_only "$DEGAUSS_DIR"; then
-  echo "Could not completely clean DeGAUSS outputs: $DEGAUSS_DIR" >&2
-  DEGAUSS_CLEANUP_STATUS=1
+ADDR_CLEANUP_STATUS=0
+
+if ((RANDOM % 2 == 0)); then
+  METHODS=(degauss addr)
+else
+  METHODS=(addr degauss)
 fi
 
-echo "Starting addr with $N_CORES workers"
-set +e
-/usr/bin/time -v -o "$ADDR_DIR/time.txt" \
-  Rscript "$ADDR_CLI" \
-  --input "$ADDR_DIR/input.csv" \
-  --output-dir "$ADDR_DIR" \
-  --workers "$N_CORES" \
-  --taf-year 2025 \
-  --data-dir "$R_USER_DATA_DIR" \
-  --overwrite
-ADDR_STATUS=$?
-set -e
-ADDR_CLEANUP_STATUS=0
-if ! keep_time_file_only "$ADDR_DIR"; then
-  echo "Could not completely clean addr outputs: $ADDR_DIR" >&2
-  ADDR_CLEANUP_STATUS=1
-fi
+printf '%s\n' "${METHODS[@]}" > "$RUN_DIR/method_order.txt"
+echo "Randomized method order: ${METHODS[*]}"
+
+for method in "${METHODS[@]}"; do
+  case $method in
+    degauss) run_degauss ;;
+    addr) run_addr ;;
+  esac
+done
 
 echo "DeGAUSS exit status: $DEGAUSS_STATUS"
 echo "addr exit status: $ADDR_STATUS"
