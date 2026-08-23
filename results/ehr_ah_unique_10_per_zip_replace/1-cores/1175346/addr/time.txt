@@ -1,0 +1,23 @@
+	Command being timed: "Rscript /users/broeg1/addr_benchmark/.R-library/addr/exec/addr-geocode --input /users/broeg1/addr_benchmark/results/ehr_ah_unique_10_per_zip_replace/1-cores/1175346/addr/input.csv --output-dir /users/broeg1/addr_benchmark/results/ehr_ah_unique_10_per_zip_replace/1-cores/1175346/addr --workers 1 --taf-year 2025 --data-dir /scratch/broeg1 --overwrite"
+	User time (seconds): 5795.01
+	System time (seconds): 15.73
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:37:40
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1154456
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 5554108
+	Voluntary context switches: 143677
+	Involuntary context switches: 6262
+	Swaps: 0
+	File system inputs: 11936
+	File system outputs: 37536
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

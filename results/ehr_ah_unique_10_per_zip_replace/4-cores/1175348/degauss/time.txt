@@ -1,0 +1,24 @@
+Command exited with non-zero status 1
+	Command being timed: "apptainer run --containall --pwd /work --bind /users/broeg1/addr_benchmark/results/ehr_ah_unique_10_per_zip_replace/4-cores/1175348/degauss:/work /users/broeg1/addr_benchmark/degauss-geocoder-3.4.1.sif /work/input.csv"
+	User time (seconds): 7693.98
+	System time (seconds): 2042.71
+	Percent of CPU this job got: 297%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 54:30.37
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 436524
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2166
+	Minor (reclaiming a frame) page faults: 244343969
+	Voluntary context switches: 45967215
+	Involuntary context switches: 15110074
+	Swaps: 0
+	File system inputs: 97640
+	File system outputs: 681552
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 1
