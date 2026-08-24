@@ -1,7 +1,7 @@
 #!/bin/bash
 #BSUB -J geocode_both
 #BSUB -q normal
-#BSUB -W 08:00
+#BSUB -W 20:00
 #BSUB -o logs/geocode_both.%J.out
 #BSUB -e logs/geocode_both.%J.err
 
