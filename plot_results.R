@@ -53,9 +53,11 @@ excluded_inputs <- sort(unique(plot_results$input[!keep_input]))
 plot_results <- plot_results[keep_input, ]
 
 input_labels <- c(
+  ehr_ah_all = "All addresses (1.03M total)",
+  ehr_ah_unique = "Unique addresses (533.1k total)",
   ehr_ah_all_100k_sample_1 = "100k sample from all",
-  ehr_ah_cincy_10k_sample_1 = "10k sample from Cincy",
   ehr_ah_unique_10_per_zip_replace = "10 per ZIP (83.9k total)",
+  ehr_ah_cincy_10k_sample_1 = "10k sample from Cincy",
   ehr_ah_10k_45211 = "10k from single ZIP"
 )
 unexpected_inputs <- setdiff(unique(plot_results$input), names(input_labels))
@@ -180,7 +182,6 @@ cat("\n\n")
 plot_results$n_cores <- factor(
   plot_results$n_cores,
   levels = expected_cores,
-  labels = c("1 core", "4 cores", "16 cores"),
   ordered = TRUE
 )
 plot_results$method <- factor(
@@ -199,18 +200,11 @@ completed_results <- plot_results[plot_results$run_status == "Completed", ]
 
 method_colors <- c(addr = "#0072B2", degauss = "#D55E00")
 method_labels <- c(addr = "addr", degauss = "DeGAUSS")
-wrap_input_label <- function(value) {
-  vapply(
-    gsub("_", " ", value, fixed = TRUE),
-    function(label) paste(strwrap(label, width = 18), collapse = "\n"),
-    character(1)
-  )
-}
 
 results_plot <- ggplot2::ggplot(
   plot_results,
   ggplot2::aes(
-    x = method,
+    x = n_cores,
     y = elapsed_seconds,
     color = method,
     fill = method
@@ -221,28 +215,28 @@ results_plot <- ggplot2::ggplot(
     width = 0.65,
     alpha = 0.18,
     linewidth = 0.6,
-    outlier.shape = NA
+    outlier.shape = NA,
+    position = ggplot2::position_dodge2(width = 0.75, preserve = "single")
   ) +
   ggplot2::geom_point(
     ggplot2::aes(shape = run_status),
     size = 1.5,
     alpha = 0.7,
-    position = ggplot2::position_jitter(width = 0.08, height = 0)
-  ) +
-  ggplot2::facet_grid(
-    rows = ggplot2::vars(n_cores),
-    cols = ggplot2::vars(input),
-    scales = "fixed",
-    labeller = ggplot2::labeller(
-      input = wrap_input_label
+    position = ggplot2::position_jitterdodge(
+      jitter.width = 0.08,
+      dodge.width = 0.75
     )
+  ) +
+  ggplot2::facet_wrap(
+    ggplot2::vars(input),
+    ncol = 2,
+    scales = "fixed"
   ) +
   ggplot2::scale_color_manual(
     values = method_colors,
     breaks = names(method_labels),
     labels = method_labels
   ) +
-  ggplot2::scale_x_discrete(labels = method_labels) +
   ggplot2::scale_fill_manual(
     values = method_colors,
     breaks = names(method_labels),
@@ -258,27 +252,22 @@ results_plot <- ggplot2::ggplot(
     expand = ggplot2::expansion(mult = c(0.04, 0.1))
   ) +
   ggplot2::labs(
-    title = "Geocoding runtime by input, method, and core count",
-    subtitle = "Rows show allocated cores; columns show input files",
-    x = "Method",
+    x = "Allocated cores",
     y = "Elapsed wall-clock time (seconds, log scale)",
     color = NULL,
-    fill = NULL,
-    caption = paste0(
-      "All allocated-core rows use the same logarithmic y-axis scale. ",
-      "Numbered input samples are limited to sample_1.\n",
-      "Whiskers extend to 1.5 times the interquartile range. ",
-      "An x marks an unsuccessful run and its time to failure."
-    )
+    fill = NULL
   ) +
   ggplot2::theme_minimal(base_size = 10) +
   ggplot2::theme(
     legend.position = "top",
     legend.justification = "left",
     panel.grid.minor = ggplot2::element_blank(),
-    strip.text = ggplot2::element_text(face = "bold", size = 8.5),
-    plot.title = ggplot2::element_text(face = "bold"),
-    plot.caption = ggplot2::element_text(hjust = 0)
+    panel.border = ggplot2::element_rect(
+      color = "grey45",
+      fill = NA,
+      linewidth = 0.6
+    ),
+    strip.text = ggplot2::element_text(face = "bold", size = 8.5)
   )
 
 output_dir <- dirname(output_file)
