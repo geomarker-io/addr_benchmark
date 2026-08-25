@@ -6,6 +6,11 @@ output_file <- if (length(args) >= 2) {
 } else {
   file.path("output", "pdf", "benchmark_results.pdf")
 }
+focused_output_file <- if (length(args) >= 3) {
+  args[[3]]
+} else {
+  file.path(dirname(output_file), "benchmark_results_100k_sample.pdf")
+}
 
 required_packages <- c("ggplot2", "knitr", "scales")
 missing_packages <- required_packages[
@@ -270,6 +275,80 @@ results_plot <- ggplot2::ggplot(
     strip.text = ggplot2::element_text(face = "bold", size = 8.5)
   )
 
+focused_input <- unname(input_labels[["ehr_ah_all_100k_sample_1"]])
+focused_results <- plot_results[plot_results$input == focused_input, ]
+focused_completed_results <- focused_results[
+  focused_results$run_status == "Completed",
+]
+
+if (nrow(focused_results) == 0) {
+  stop("No benchmark results found for ", focused_input, ".")
+}
+
+focused_plot <- ggplot2::ggplot(
+  focused_results,
+  ggplot2::aes(
+    x = n_cores,
+    y = elapsed_seconds,
+    color = method,
+    fill = method
+  )
+) +
+  ggplot2::geom_boxplot(
+    data = focused_completed_results,
+    width = 0.65,
+    alpha = 0.18,
+    linewidth = 0.6,
+    outlier.shape = NA,
+    position = ggplot2::position_dodge2(width = 0.75, preserve = "single")
+  ) +
+  ggplot2::geom_point(
+    ggplot2::aes(shape = run_status),
+    size = 1.7,
+    alpha = 0.7,
+    position = ggplot2::position_jitterdodge(
+      jitter.width = 0.08,
+      dodge.width = 0.75
+    )
+  ) +
+  ggplot2::facet_wrap(ggplot2::vars(input), ncol = 1) +
+  ggplot2::scale_color_manual(
+    values = method_colors,
+    breaks = names(method_labels),
+    labels = method_labels
+  ) +
+  ggplot2::scale_fill_manual(
+    values = method_colors,
+    breaks = names(method_labels),
+    labels = method_labels
+  ) +
+  ggplot2::scale_shape_manual(
+    values = c(Completed = 16, Failed = 4),
+    name = NULL
+  ) +
+  ggplot2::scale_y_continuous(
+    labels = scales::label_number(accuracy = 1, big.mark = ","),
+    expand = ggplot2::expansion(mult = c(0.02, 0.08))
+  ) +
+  ggplot2::labs(
+    x = "Allocated cores",
+    y = "Elapsed wall-clock time (seconds)",
+    color = NULL,
+    fill = NULL
+  ) +
+  ggplot2::theme_minimal(base_size = 10) +
+  ggplot2::theme(
+    legend.position = "top",
+    legend.justification = "left",
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.border = ggplot2::element_rect(
+      color = "grey45",
+      fill = NA,
+      linewidth = 0.6
+    ),
+    strip.text = ggplot2::element_text(face = "bold", size = 9)
+  )
+
 output_dir <- dirname(output_file)
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE)
@@ -284,3 +363,18 @@ ggplot2::ggsave(
   units = "in"
 )
 message("Saved results figure to ", output_file, ".")
+
+focused_output_dir <- dirname(focused_output_file)
+if (!dir.exists(focused_output_dir)) {
+  dir.create(focused_output_dir, recursive = TRUE)
+}
+
+ggplot2::ggsave(
+  filename = focused_output_file,
+  plot = focused_plot,
+  device = "pdf",
+  width = 7,
+  height = 5,
+  units = "in"
+)
+message("Saved focused 100k results figure to ", focused_output_file, ".")
