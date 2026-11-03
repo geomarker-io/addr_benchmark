@@ -1,5 +1,18 @@
+.DS_Store
 inputs/*
-.R-library/*
-logs/*
-degauss-geocoder-3.4.1.sif
-**/degauss/geocoding-cache/
+.R-library/
+logs/
+containers/
+*.sif
+.work/
+output/
+benchmark_results.rds
+
+# Keep only timing and provenance; address-level files must stay untracked.
+results/**
+!results/**/
+!results/**/time.txt
+!results/**/method_order.txt
+!results/**/metadata.tsv
+!results/**/status.tsv
+!results/**/complete.txt
