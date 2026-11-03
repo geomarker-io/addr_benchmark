@@ -1,217 +1,131 @@
 args <- commandArgs(trailingOnly = TRUE)
-
+script_arg <- grep("^--file=", commandArgs(), value = TRUE)[[1]]
+script_dir <- dirname(normalizePath(sub("^--file=", "", script_arg)))
+source(file.path(script_dir, "R", "benchmark.R"))
 results_dir <- if (length(args) >= 1) args[[1]] else "results"
-output_file <- if (length(args) >= 2) args[[2]] else "benchmark_results.rds"
-
-time_files <- list.files(
-  results_dir,
-  pattern = "^time[.]txt$",
-  recursive = TRUE,
-  full.names = TRUE
-)
-
-if (length(time_files) == 0) {
-  stop("No time.txt files found under ", results_dir, ".")
-}
+output_file <- if (length(args) >= 2) args[[2]] else "output/benchmark_results.rds"
+metadata_files <- sort(list.files(results_dir, "^metadata[.]tsv$", recursive = TRUE, full.names = TRUE))
+if (!length(metadata_files)) stop("No new benchmark jobs found under ", results_dir, ".")
 
 elapsed_seconds <- function(value) {
-  parts <- as.numeric(strsplit(value, ":", fixed = TRUE)[[1]])
-  if (length(parts) == 2 && all(!is.na(parts))) {
-    return(parts[[1]] * 60 + parts[[2]])
-  }
-  if (length(parts) == 3 && all(!is.na(parts))) {
-    return(parts[[1]] * 3600 + parts[[2]] * 60 + parts[[3]])
-  }
+  parts <- suppressWarnings(as.numeric(strsplit(value, ":", fixed = TRUE)[[1]]))
+  if (length(parts) == 2 && all(is.finite(parts))) return(sum(parts * c(60, 1)))
+  if (length(parts) == 3 && all(is.finite(parts))) return(sum(parts * c(3600, 60, 1)))
   NA_real_
 }
 
-parse_time_file <- function(path) {
+read_timing <- function(path) {
+  empty <- list(elapsed_seconds = NA_real_, maximum_resident_set_kb = NA_real_,
+                time_exit_status = NA_integer_, time_complete = FALSE)
+  if (!file.exists(path)) return(empty)
   lines <- trimws(readLines(path, warn = FALSE))
+  signal <- grep("^Command terminated by signal [0-9]+$", lines, value = TRUE)
   separators <- regexpr(": ", lines, fixed = TRUE)
   lines <- lines[separators > 0]
   separators <- separators[separators > 0]
+  fields <- setNames(substring(lines, separators + 2), substr(lines, 1, separators - 1))
+  get <- function(name) if (name %in% names(fields)) fields[[name]] else NA_character_
+  elapsed <- get("Elapsed (wall clock) time (h:mm:ss or m:ss)")
+  if (!is.na(elapsed)) empty$elapsed_seconds <- elapsed_seconds(elapsed)
+  empty$maximum_resident_set_kb <- suppressWarnings(as.numeric(get("Maximum resident set size (kbytes)")))
+  empty$time_exit_status <- suppressWarnings(as.integer(get("Exit status")))
+  # GNU time can print exit status 0 for a child terminated by a signal.
+  if (length(signal) == 1L) {
+    empty$time_exit_status <- 128L + as.integer(sub(".* ", "", signal))
+  }
+  empty$time_complete <- is.finite(empty$elapsed_seconds) && empty$elapsed_seconds >= 0 &&
+    is.finite(empty$maximum_resident_set_kb) && empty$maximum_resident_set_kb > 0 &&
+    !is.na(empty$time_exit_status)
+  empty
+}
 
-  fields <- substr(lines, 1, separators - 1)
-  values <- substring(lines, separators + 2)
-  values <- stats::setNames(values, fields)
-
-  required_fields <- c(
-    "Command being timed",
-    "User time (seconds)",
-    "System time (seconds)",
-    "Percent of CPU this job got",
-    "Elapsed (wall clock) time (h:mm:ss or m:ss)",
-    "Average shared text size (kbytes)",
-    "Average unshared data size (kbytes)",
-    "Average stack size (kbytes)",
-    "Average total size (kbytes)",
-    "Maximum resident set size (kbytes)",
-    "Average resident set size (kbytes)",
-    "Major (requiring I/O) page faults",
-    "Minor (reclaiming a frame) page faults",
-    "Voluntary context switches",
-    "Involuntary context switches",
-    "Swaps",
-    "File system inputs",
-    "File system outputs",
-    "Socket messages sent",
-    "Socket messages received",
-    "Signals delivered",
-    "Page size (bytes)",
-    "Exit status"
-  )
-
-  missing_fields <- setdiff(required_fields, names(values))
-  if (length(missing_fields) > 0) {
-    stop(
-      "Missing fields in ",
-      path,
-      ": ",
-      paste(missing_fields, collapse = ", ")
+read_job <- function(path) {
+  job_dir <- dirname(path)
+  metadata <- read.delim(path, colClasses = "character", quote = "", check.names = FALSE)
+  if (!identical(names(metadata), c("key", "value")) || anyDuplicated(metadata$key)) {
+    stop("Invalid metadata in ", path)
+  }
+  meta <- setNames(metadata$value, metadata$key)
+  required <- c("benchmark_schema", "input", "n_cores", "job_id", "input_sha256",
+                "hostname", "architecture", "cpu_model", "git_commit", "tracked_changes",
+                "runner_sha256", "config_sha256", "addr_version", "addr_release",
+                "addr_taf_schema", "addr_taf_year", "addr_image_ref", "addr_image_sha256",
+                "degauss_version", "degauss_image_ref", "degauss_image_sha256")
+  if (length(setdiff(required, names(meta)))) stop("Incomplete metadata in ", path)
+  if (meta[["benchmark_schema"]] != "2" ||
+      !meta[["input"]] %in% names(benchmark_inputs) ||
+      !meta[["n_cores"]] %in% as.character(benchmark_cores)) stop("Unexpected experiment in ", path)
+  if (basename(job_dir) != meta[["job_id"]] ||
+      basename(dirname(job_dir)) != paste0(meta[["n_cores"]], "-cores") ||
+      basename(dirname(dirname(job_dir))) != meta[["input"]]) stop("Metadata/path mismatch in ", path)
+  order_path <- file.path(job_dir, "method_order.txt")
+  method_order <- if (file.exists(order_path)) readLines(order_path, warn = FALSE) else character()
+  if (length(method_order) &&
+      (length(method_order) != length(benchmark_methods) ||
+       !setequal(method_order, names(benchmark_methods)))) stop("Invalid ordering in ", order_path)
+  status_path <- file.path(job_dir, "status.tsv")
+  status <- if (file.exists(status_path)) {
+    read.delim(status_path, colClasses = c("character", "integer", "integer"), quote = "")
+  } else data.frame(method = character(), exit_status = integer(), cleanup_status = integer())
+  if (!identical(names(status), c("method", "exit_status", "cleanup_status")) ||
+      anyDuplicated(status$method) || any(!status$method %in% names(benchmark_methods))) {
+    stop("Invalid method statuses in ", status_path)
+  }
+  job_complete <- file.exists(file.path(job_dir, "complete.txt"))
+  if (job_complete && (nrow(status) != length(benchmark_methods) || !length(method_order))) {
+    stop("Completion marker without all method statuses/order in ", job_dir)
+  }
+  rows <- lapply(names(benchmark_methods), function(method) {
+    timing <- read_timing(file.path(job_dir, method, "time.txt"))
+    s <- status[status$method == method, , drop = FALSE]
+    exit_status <- if (nrow(s)) s$exit_status else NA_integer_
+    cleanup_status <- if (nrow(s)) s$cleanup_status else NA_integer_
+    if (nrow(s) && !is.na(timing$time_exit_status) && !is.na(exit_status) &&
+        exit_status != timing$time_exit_status) stop("Conflicting exit statuses in ", job_dir, "/", method)
+    run_status <- if (!nrow(s)) {
+      "missing"
+    } else if (is.na(exit_status) || is.na(cleanup_status)) {
+      "incomplete"
+    } else if (cleanup_status != 0L) {
+      "cleanup-failed"
+    } else if (exit_status != 0L) {
+      "failed"
+    } else if (!timing$time_complete) {
+      "incomplete"
+    } else "completed"
+    data.frame(
+      as.list(meta[required]), method = method,
+      order_position = match(method, method_order), job_complete = job_complete,
+      exit_status = exit_status, cleanup_status = cleanup_status, run_status = run_status,
+      elapsed_seconds = timing$elapsed_seconds,
+      maximum_resident_set_kb = timing$maximum_resident_set_kb,
+      stringsAsFactors = FALSE, check.names = FALSE
     )
-  }
-
-  method_dir <- dirname(path)
-  job_dir <- dirname(method_dir)
-  cores_dir <- dirname(job_dir)
-  input_dir <- dirname(cores_dir)
-  cores_name <- basename(cores_dir)
-  order_file <- file.path(job_dir, "method_order.txt")
-
-  if (!grepl("^[0-9]+-cores$", cores_name)) {
-    stop("Unexpected results path: ", path)
-  }
-
-  first_method <- NA_character_
-  if (file.exists(order_file)) {
-    method_order <- trimws(readLines(order_file, warn = FALSE))
-    method_order <- method_order[nzchar(method_order)]
-
-    if (
-      length(method_order) != 2 ||
-        !setequal(method_order, c("addr", "degauss"))
-    ) {
-      stop("Unexpected method ordering in ", order_file, ".")
-    }
-
-    first_method <- method_order[[1]]
-  }
-
-  numeric_value <- function(field) as.numeric(values[[field]])
-
-  list(
-    input = basename(input_dir),
-    n_cores = as.integer(sub("-cores$", "", cores_name)),
-    job_id = basename(job_dir),
-    method = basename(method_dir),
-    first_method = first_method,
-    command = sub('^"(.*)"$', "\\1", values[["Command being timed"]]),
-    user_seconds = numeric_value("User time (seconds)"),
-    system_seconds = numeric_value("System time (seconds)"),
-    cpu_percent = as.numeric(sub(
-      "%$",
-      "",
-      values[["Percent of CPU this job got"]]
-    )),
-    elapsed_seconds = elapsed_seconds(
-      values[["Elapsed (wall clock) time (h:mm:ss or m:ss)"]]
-    ),
-    average_shared_text_kb = numeric_value("Average shared text size (kbytes)"),
-    average_unshared_data_kb = numeric_value(
-      "Average unshared data size (kbytes)"
-    ),
-    average_stack_kb = numeric_value("Average stack size (kbytes)"),
-    average_total_size_kb = numeric_value("Average total size (kbytes)"),
-    maximum_resident_set_kb = numeric_value(
-      "Maximum resident set size (kbytes)"
-    ),
-    average_resident_set_kb = numeric_value(
-      "Average resident set size (kbytes)"
-    ),
-    major_page_faults = numeric_value("Major (requiring I/O) page faults"),
-    minor_page_faults = numeric_value("Minor (reclaiming a frame) page faults"),
-    voluntary_context_switches = numeric_value("Voluntary context switches"),
-    involuntary_context_switches = numeric_value(
-      "Involuntary context switches"
-    ),
-    swaps = numeric_value("Swaps"),
-    file_system_inputs = numeric_value("File system inputs"),
-    file_system_outputs = numeric_value("File system outputs"),
-    socket_messages_sent = numeric_value("Socket messages sent"),
-    socket_messages_received = numeric_value("Socket messages received"),
-    signals_delivered = numeric_value("Signals delivered"),
-    page_size_bytes = numeric_value("Page size (bytes)"),
-    exit_status = as.integer(values[["Exit status"]]),
-    time_file = path
-  )
+  })
+  do.call(rbind, rows)
 }
 
-rows <- lapply(sort(time_files), parse_time_file)
-benchmark_results <- tibble::as_tibble(
-  do.call(
-    rbind,
-    lapply(rows, as.data.frame, stringsAsFactors = FALSE, optional = TRUE)
-  )
-)
-
-benchmark_results <- benchmark_results[
-  order(
-    benchmark_results$input,
-    benchmark_results$n_cores,
-    benchmark_results$job_id,
-    benchmark_results$method
-  ),
-]
-
-missing_order <- benchmark_results[is.na(benchmark_results$first_method), ]
-if (nrow(missing_order) > 0) {
-  missing_jobs <- unique(paste(
-    missing_order$input,
-    paste0(missing_order$n_cores, "-cores"),
-    missing_order$job_id,
-    sep = "/"
-  ))
-  warning(
-    "Missing method_order.txt for ",
-    length(missing_jobs),
-    " job(s); first_method is NA: ",
-    paste(missing_jobs, collapse = ", ")
-  )
+benchmark_results <- do.call(rbind, lapply(metadata_files, read_job))
+benchmark_results$n_cores <- as.integer(benchmark_results$n_cores)
+rownames(benchmark_results) <- NULL
+# Prevent accidental pooling across tool versions, input revisions, or architectures.
+for (field in c("benchmark_schema", "architecture", "addr_version", "addr_release",
+                "addr_taf_schema", "addr_taf_year", "addr_image_ref", "degauss_version",
+                "degauss_image_ref", "runner_sha256", "config_sha256")) {
+  if (length(unique(benchmark_results[[field]])) != 1L) stop("Mixed ", field, " values; collect separate experiments.")
 }
-
-replicate_counts <- aggregate(
-  job_id ~ input + n_cores + method,
-  data = benchmark_results,
-  FUN = length
-)
-names(replicate_counts)[names(replicate_counts) == "job_id"] <- "n_replicates"
-
-median_times <- aggregate(
-  elapsed_seconds ~ input + n_cores + method,
-  data = benchmark_results,
-  FUN = median,
-  na.rm = TRUE
-)
-names(median_times)[names(median_times) == "elapsed_seconds"] <-
-  "median_elapsed_seconds"
-
-results_summary <- merge(
-  replicate_counts,
-  median_times,
-  by = c("input", "n_cores", "method"),
-  sort = FALSE
-)
-results_summary <- tibble::as_tibble(results_summary)
-results_summary <- results_summary[
-  order(
-    results_summary$input,
-    results_summary$n_cores,
-    results_summary$method
-  ),
-]
-
-cat("Results summary by input, core count, and method:\n")
-print(results_summary, n = Inf, width = Inf)
-
+for (input in unique(benchmark_results$input)) {
+  hashes <- benchmark_results$input_sha256[benchmark_results$input == input]
+  if (length(unique(hashes)) != 1L) stop("Input contents changed between jobs: ", input)
+}
+if (any(!benchmark_results$job_complete)) warning("Interrupted jobs are present; inspect missing/incomplete methods.")
+if (any(benchmark_results$run_status != "completed")) warning("Failed or incomplete methods are excluded from medians.")
+if (length(unique(benchmark_results$cpu_model)) > 1L) warning("Jobs ran on different CPU models; inspect metadata before comparing timings.")
+summary <- summarize_benchmark(benchmark_results)
+dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
 saveRDS(benchmark_results, output_file)
-message("Saved ", nrow(benchmark_results), " rows to ", output_file, ".")
+summary_file <- file.path(dirname(output_file), "benchmark_summary.csv")
+write.csv(summary, summary_file, row.names = FALSE, na = "")
+print(summary, row.names = FALSE)
+message("Saved ", nrow(benchmark_results), " method records to ", output_file)
+message("Saved summary to ", summary_file)
