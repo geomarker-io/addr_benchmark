@@ -7,7 +7,6 @@ containers/
 .work/
 output/
 benchmark_results.rds
-__pycache__/
 
 # Keep only timing and provenance; address-level files must stay untracked.
 results/**

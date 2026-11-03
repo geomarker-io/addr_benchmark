@@ -191,16 +191,3 @@ Rscript --vanilla plot_results.R output/benchmark_results.rds output
 The historical host-addr experiment, its timing files, and its generated plots
 have been removed. They remain recoverable in Git history before `8d4bef9`.
 New results belong only to the container/preset design described here.
-
-## Local verification
-
-```bash
-for script in benchmark_config.sh setup_containers.sh geocode_both.bat submit_repeats.sh; do
-  bash -n "$script" || break
-done
-python3 -m unittest discover -s tests -v
-```
-
-The checks use synthetic addresses and mock LSF/Apptainer/GNU time commands to
-exercise submission, isolation, cleanup, failures, and R reporting. They do not
-run the real images or establish HPC performance results.
