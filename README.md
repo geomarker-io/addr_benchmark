@@ -191,3 +191,27 @@ Rscript --vanilla plot_results.R output/benchmark_results.rds output
 The historical host-addr experiment, its timing files, and its generated plots
 have been removed. They remain recoverable in Git history before `8d4bef9`.
 New results belong only to the container/preset design described here.
+
+### Collecting single-method replacements
+
+For the November 2026 recovery batch, the collector accepts a third argument
+containing single-method jobs and a fourth argument listing comma-separated
+pilot job IDs to exclude:
+
+```bash
+Rscript --vanilla collect_results.R .results/results output/benchmark_results.rds results-single 1959139
+```
+
+Replacement metadata must identify the original job as `repeat = replacement-JOBID`.
+Each replacement targets exactly one unfinished original method. The collector
+checks input, image and configuration provenance and permits only the reviewed
+single-method runner hash. Original and replacement runner hashes remain in the
+output. `benchmark_audit.rds` preserves all original and replacement records,
+including the pilot and unfinished records; the primary RDS and summary use
+replacement records in place of unfinished methods and exclude the named pilot.
+Original jobs retain their incomplete-job markers even when all missing methods
+have been recovered. CPU differences and separate-job/cache conditions limit
+interpretation of scaling and cross-method comparisons.
+
+If ggplot2 is unavailable, run `Rscript --vanilla plot_results_base.R` from the
+checkout to generate PNG runtime and memory charts with base R.

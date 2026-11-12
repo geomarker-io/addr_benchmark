@@ -1,0 +1,5 @@
+addr-loose
+addr-strict
+addr-default
+addr-exact-zip
+degauss

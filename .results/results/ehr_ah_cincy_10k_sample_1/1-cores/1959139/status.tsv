@@ -1,0 +1,6 @@
+method	exit_status	cleanup_status
+degauss	0	0
+addr-strict	0	0
+addr-loose	0	0
+addr-default	0	0
+addr-exact-zip	0	0

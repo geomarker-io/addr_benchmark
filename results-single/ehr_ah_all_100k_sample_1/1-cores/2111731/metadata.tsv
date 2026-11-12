@@ -1,0 +1,27 @@
+key	value
+benchmark_schema	2
+started_utc	2026-11-11T14:07:38Z
+input	ehr_ah_all_100k_sample_1
+input_sha256	2df76cce266bf7ffa85a2b0ccbfbf6860ef450e849be7daf71179ad839d07869
+n_cores	1
+job_id	2111731
+repeat	replacement-1974473
+hostname	bmi-460g10-03.chmcres.cchmc.org
+architecture	x86_64
+cpu_model	Intel(R) Xeon(R) Gold 6132 CPU @ 2.60GHz
+host_memory_kb	263257472
+apptainer_version	apptainer version 1.4.2
+time_version	time (GNU Time) 1.9
+git_commit	e43f6f0f59dd777da5eedaf787ce2c95277a2d29
+tracked_changes	false
+runner_sha256	8000862d7347e69cf6c426c4137819ab594bf858b4c11cd07d4392fe5c60482d
+config_sha256	2eefd5b3e2a54356cac71892c1916142daf23b61b971c0880b5103190c756c2f
+addr_version	2.0.0
+addr_release	v2.0.0-taf-v2-2025
+addr_taf_schema	v2
+addr_taf_year	2025
+addr_image_ref	ghcr.io/geomarker-io/addr_geocoder@sha256:dcab055d5b70e299f753f07af332ccddd4723c23dd357f5063af3552beb40b83
+addr_image_sha256	5751f971a4fc218fd5e2cbf205ea9e0678039924014e264dea72f431c39db95c
+degauss_version	3.4.2
+degauss_image_ref	ghcr.io/degauss-org/geocoder@sha256:b4e3219bc93f79342c81676b59c38bed6f32e4817084cfdedda02b941c4b0473
+degauss_image_sha256	c9e990b1634b098a8681975a84a12940e0f08a4a5324ac219c22ad6f048de2d0

@@ -1,0 +1,23 @@
+	Command being timed: "apptainer run --cleanenv --containall --pwd /work --bind /users/broeg1/addr_benchmark/.work/job-1959139.aCC9MF/addr-strict:/work --bind /users/broeg1/addr_benchmark/.work/job-1959139.aCC9MF/addr-strict/tmp:/tmp --env LSB_DJOB_NUMPROC=1,LSB_MAX_NUM_PROCESSORS=1 --env OMP_NUM_THREADS=1,OPENBLAS_NUM_THREADS=1,MKL_NUM_THREADS=1 --env R_PROFILE_USER=/dev/null,R_ENVIRON_USER=/dev/null,R_LIBS=/dev/null,R_LIBS_USER=/dev/null --env R_USER_DATA_DIR=/opt/addr-data,ADDR_GEOCODE_RELEASE_TAG=v2.0.0-taf-v2-2025 /users/broeg1/addr_benchmark/containers/addr_geocoder_v2.0.0-taf-v2-2025.sif --input /work/input.csv --output-dir /work --workers 1 --preset strict"
+	User time (seconds): 393.98
+	System time (seconds): 3.03
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 6:38.59
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 510792
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 479
+	Minor (reclaiming a frame) page faults: 966278
+	Voluntary context switches: 195959
+	Involuntary context switches: 384
+	Swaps: 0
+	File system inputs: 72
+	File system outputs: 3232
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

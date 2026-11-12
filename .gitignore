@@ -16,3 +16,4 @@ results/**
 !results/**/metadata.tsv
 !results/**/status.tsv
 !results/**/complete.txt
+geocoding_cache/
